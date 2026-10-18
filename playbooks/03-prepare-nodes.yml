@@ -1,0 +1,5 @@
+---
+- name: Prepare every node (kernel, containerd, kubeadm/kubelet/kubectl)
+  hosts: k8s_cluster
+  roles:
+    - k8s_common

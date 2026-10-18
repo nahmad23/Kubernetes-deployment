@@ -1,0 +1,24 @@
+---
+- name: Join worker nodes
+  hosts: kube_node
+  roles:
+    - k8s_worker
+
+- name: Confirm the cluster is healthy
+  hosts: kube_control_plane[0]
+  gather_facts: false
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Wait for every node to be Ready
+      ansible.builtin.command: kubectl wait --for=condition=Ready nodes --all --timeout=600s
+      changed_when: false
+
+    - name: Show nodes
+      ansible.builtin.command: kubectl get nodes -o wide
+      register: nodes
+      changed_when: false
+
+    - name: Print nodes
+      ansible.builtin.debug:
+        var: nodes.stdout_lines

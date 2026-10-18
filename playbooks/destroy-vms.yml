@@ -1,0 +1,29 @@
+---
+# Stops and undefines every k8s VM. Disk images are left in place, and
+# passthrough (Longhorn) LUNs are never touched. Run with:  -e confirm_destroy=yes
+- name: Destroy Kubernetes VMs
+  hosts: kvm_hosts
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Refuse to run without confirmation
+      ansible.builtin.assert:
+        that: confirm_destroy | default('no') == 'yes'
+        fail_msg: "This removes the VMs. Re-run with -e confirm_destroy=yes"
+      run_once: true
+
+    - name: Stop and undefine VMs placed on this host
+      ansible.builtin.shell: |
+        if virsh dominfo {{ item }} >/dev/null 2>&1; then
+          virsh destroy {{ item }} 2>/dev/null || true
+          virsh undefine {{ item }} --nvram 2>/dev/null || virsh undefine {{ item }}
+          echo removed
+        fi
+      register: removed
+      changed_when: "'removed' in removed.stdout"
+      loop: >-
+        {{ groups['k8s_cluster']
+           | map('extract', hostvars)
+           | selectattr('kvm_host', 'defined')
+           | selectattr('kvm_host', 'equalto', inventory_hostname)
+           | map(attribute='inventory_hostname') | list }}

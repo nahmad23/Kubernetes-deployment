@@ -1,0 +1,6 @@
+---
+collections:
+  # ulx.ops: your internal collection (kvm_install, network, kvm_vm_provision, k8s_api_lb).
+  # Add its source here, e.g. a git URL or your Automation Hub.
+  - name: community.general    # modprobe, dict_kv
+  - name: ansible.posix        # sysctl, authorized_key

@@ -1,0 +1,11 @@
+---
+ansible_user: "{{ vm_admin_user }}"
+ansible_become: true
+ansible_python_interpreter: /usr/bin/python3
+
+# VM sizing defaults; override per host in hosts.yml
+vm_vcpus: 8
+vm_memory_mb: 48000
+vm_disk_size: 200G
+vm_disks: []                           # passthrough disks: {device, interndisk, mount}
+vm_packages: []

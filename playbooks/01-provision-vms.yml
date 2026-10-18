@@ -1,0 +1,67 @@
+---
+# Replaces the four copy-pasted "Create ... on ctlXXp" blocks: every VM comes
+# from inventory/hosts.yml and is built on its kvm_host with your ulx.ops roles.
+- name: Prepare KVM hosts and create the VMs
+  hosts: kvm_hosts
+  gather_facts: true
+  roles:
+    - ulx.ops.kvm_install
+    - ulx.ops.network
+  tasks:
+    - name: Create each VM that lives on this host
+      ansible.builtin.include_role:
+        name: ulx.ops.kvm_vm_provision
+      vars:
+        vm: "{{ hostvars[vm_name] }}"
+        kvm_vm_name: "{{ vm_name }}"
+        kvm_vm_disk_size: "{{ vm.vm_disk_size }}"
+        kvm_vm_vcpus: "{{ vm.vm_vcpus }}"
+        kvm_vm_memory_mb: "{{ vm.vm_memory_mb }}"
+        kvm_vm_force_recreate: false
+        kvm_vm_cloudinit_root_password: "{{ vault_kvm_vm_root_password }}"
+        kvm_vm_cloudinit_ssh_authorized_keys: "{{ ulx_ssh_authorized_keys }}"
+        # bootcmd runs on every boot, so only add the line if it's missing
+        kvm_vm_cloudinit_bootcmd:
+          - >-
+            grep -q '{{ k8s_api_fqdn }}' /etc/hosts ||
+            echo '{{ k8s_api_vip }} {{ k8s_api_fqdn }}' >> /etc/hosts
+        kvm_vm_cloudinit_packages: "{{ vm.vm_packages }}"
+        kvm_vm_passthrough_disks: "{{ vm.vm_disks }}"
+        kvm_vm_cloudinit_fs_setup: >-
+          {{ vm.vm_disks | map(attribute='interndisk')
+             | map('community.general.dict_kv', 'device')
+             | map('combine', {'filesystem': 'ext4'}) | list }}
+        kvm_vm_cloudinit_mounts: >-
+          {{ vm.vm_disks | map(attribute='interndisk')
+             | zip(vm.vm_disks | map(attribute='mount')) | map('list') | list }}
+        kvm_vm_cloudinit_network_config:
+          version: 2
+          ethernets:
+            enp1s0:   # br0
+              addresses: ["{{ vm.ansible_host }}/{{ vm_mgmt_prefix }}"]
+              routes:
+                - to: default
+                  via: "{{ vm_gateway }}"
+              nameservers:
+                addresses: "{{ vm_dns_servers }}"
+            enp2s0:   # br1
+              addresses: ["{{ vm.k8s_ip }}/{{ vm_k8s_prefix }}"]
+      loop: >-
+        {{ groups['k8s_cluster']
+           | map('extract', hostvars)
+           | selectattr('kvm_host', 'defined')
+           | selectattr('kvm_host', 'equalto', inventory_hostname)
+           | map(attribute='inventory_hostname') | list }}
+      loop_control:
+        loop_var: vm_name
+
+- name: Wait for the VMs to answer on SSH
+  hosts: k8s_cluster
+  gather_facts: false
+  tasks:
+    - name: Wait for SSH as ubuntu (the ansible user doesn't exist yet)
+      ansible.builtin.wait_for_connection:
+        delay: 10
+        timeout: 900
+      vars:
+        ansible_user: ubuntu

@@ -1,0 +1,30 @@
+---
+- name: Check whether this worker already joined
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubelet_conf
+
+- name: Create a short-lived join command on the control plane
+  ansible.builtin.command: kubeadm token create --ttl 30m --print-join-command
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  run_once: true
+  register: join_cmd
+  changed_when: false
+  when: >-
+    groups['kube_node']
+    | map('extract', hostvars, ['kubelet_conf', 'stat', 'exists'])
+    | reject | list | length > 0
+
+- name: Join the cluster
+  ansible.builtin.command: "{{ join_cmd.stdout }}"
+  args:
+    creates: /etc/kubernetes/kubelet.conf
+  when: not kubelet_conf.stat.exists
+
+- name: Label as worker
+  ansible.builtin.command: >-
+    kubectl label node {{ inventory_hostname }} node-role.kubernetes.io/worker= --overwrite
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  changed_when: false

@@ -1,0 +1,109 @@
+---
+- name: Wait for cloud-init to finish first boot
+  ansible.builtin.command: cloud-init status --wait
+  changed_when: false
+
+- name: Turn swap off now
+  ansible.builtin.command: swapoff -a
+  when: ansible_swaptotal_mb | int > 0
+  changed_when: true
+
+- name: Keep swap off after reboot
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s.*)$'
+    replace: '# \1'
+
+- name: Load kernel modules for container networking on boot
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+    mode: "0644"
+
+- name: Load kernel modules now
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop: [overlay, br_netfilter]
+
+- name: Set Kubernetes networking sysctls
+  ansible.posix.sysctl:
+    name: "{{ item }}"
+    value: "1"
+    sysctl_file: /etc/sysctl.d/99-kubernetes.conf
+    reload: true
+  loop:
+    - net.bridge.bridge-nf-call-iptables
+    - net.bridge.bridge-nf-call-ip6tables
+    - net.ipv4.ip_forward
+
+- name: Add every cluster node to /etc/hosts
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} k8s nodes (ansible)"
+    block: |
+      {{ k8s_api_vip }} {{ k8s_api_fqdn }}
+      {% for h in groups['k8s_cluster'] %}
+      {{ hostvars[h].k8s_ip }} {{ h }}
+      {% endfor %}
+
+- name: Install containerd and apt prerequisites
+  ansible.builtin.apt:
+    name: [containerd, apt-transport-https, ca-certificates, curl, gpg]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Read containerd's default config
+  ansible.builtin.command: containerd config default
+  register: containerd_default
+  changed_when: false
+
+- name: Write containerd config with the systemd cgroup driver
+  ansible.builtin.copy:
+    dest: /etc/containerd/config.toml
+    content: "{{ containerd_default.stdout | regex_replace('SystemdCgroup = false', 'SystemdCgroup = true') }}\n"
+    mode: "0644"
+  notify: Restart containerd
+
+- name: Ensure containerd is running
+  ansible.builtin.systemd_service:
+    name: containerd
+    enabled: true
+    state: started
+
+- name: Add the Kubernetes apt repository
+  ansible.builtin.deb822_repository:
+    name: kubernetes
+    types: deb
+    uris: "{{ k8s_apt_repo_url }}"
+    suites: /
+    signed_by: "{{ k8s_apt_repo_url }}Release.key"
+
+- name: Install kubelet, kubeadm and kubectl
+  ansible.builtin.apt:
+    name: "{{ k8s_packages }}"
+    state: present
+    update_cache: true
+
+- name: Hold Kubernetes packages so apt upgrades don't bump them
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ k8s_packages }}"
+
+- name: Keep kubelet on the Kubernetes network (two NICs, default route is on the other)
+  ansible.builtin.copy:
+    dest: /etc/default/kubelet
+    content: "KUBELET_EXTRA_ARGS=--node-ip={{ k8s_ip }}\n"
+    mode: "0644"
+
+- name: Enable kubelet
+  ansible.builtin.systemd_service:
+    name: kubelet
+    enabled: true
+
+- name: Apply containerd changes before kubeadm runs
+  ansible.builtin.meta: flush_handlers

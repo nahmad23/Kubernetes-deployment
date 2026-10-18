@@ -1,0 +1,3 @@
+---
+k8s_packages: [kubelet, kubeadm, kubectl]
+k8s_apt_repo_url: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_version_minor }}/deb/"

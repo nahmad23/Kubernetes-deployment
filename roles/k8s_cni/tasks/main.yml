@@ -1,0 +1,38 @@
+---
+- name: Check whether Calico is already installed
+  ansible.builtin.command: kubectl get installation default
+  environment: &kube
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: calico_installed
+  changed_when: false
+  failed_when: false
+
+- name: Install the Tigera operator
+  ansible.builtin.command: >-
+    kubectl apply --server-side -f {{ calico_manifest_base }}/tigera-operator.yaml
+  environment: *kube
+  when: calico_installed.rc != 0
+
+- name: Wait for the operator CRDs
+  ansible.builtin.command: >-
+    kubectl wait --for condition=established --timeout=120s
+    crd/installations.operator.tigera.io crd/apiservers.operator.tigera.io
+  environment: *kube
+  changed_when: false
+
+- name: Write the Calico installation spec
+  ansible.builtin.template:
+    src: calico-installation.yaml.j2
+    dest: /etc/kubernetes/calico-installation.yaml
+    mode: "0600"
+  register: calico_spec
+
+- name: Apply the Calico installation spec
+  ansible.builtin.command: kubectl apply -f /etc/kubernetes/calico-installation.yaml
+  environment: *kube
+  when: calico_spec is changed
+
+- name: Wait for the control-plane node to become Ready
+  ansible.builtin.command: kubectl wait --for=condition=Ready node/{{ inventory_hostname }} --timeout=600s
+  environment: *kube
+  changed_when: false

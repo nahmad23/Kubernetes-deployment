@@ -1,0 +1,5 @@
+---
+# Copy to vault.yml and encrypt:  ansible-vault encrypt inventory/group_vars/all/vault.yml
+# (or keep using your existing group_vars/vault.yml)
+vault_kvm_vm_root_password: 'CHANGE_ME'
+vault_k8s_api_keepalived_auth_pass: 'CHANGE_ME'   # max 8 characters for VRRP PASS auth
