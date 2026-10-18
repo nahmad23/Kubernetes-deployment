@@ -1,6 +1,6 @@
 # Kubernetes on KVM (uxus1kub1ctl01p / uxus1kub1ctl02p)
 
-Ansible automation that creates the cluster VMs on the two KVM hosts with your existing `ulx.ops` roles, configures them, and builds an HA kubeadm cluster: 3 control planes behind your HAProxy + keepalived API VIP, 6 workers, containerd and Calico.
+Ansible automation that creates the cluster VMs on the two KVM hosts with your existing `ulx.ops` roles, configures them, and builds an HA kubeadm cluster: 3 control planes behind your HAProxy + keepalived API VIP, 5 workers, containerd and Calico.
 
 It is a refactor of your existing provisioning playbook. The four copy-pasted "Create ... on ctlXXp" blocks are replaced by one loop driven by `inventory/hosts.yml`, so adding or moving a VM is a one-line inventory change.
 
