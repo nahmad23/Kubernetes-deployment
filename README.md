@@ -1,6 +1,6 @@
-# Kubernetes on KVM (uxus1kub2ctl01p / uxus1kub2ctl02p)
+# Kubernetes on KVM (uxus1kub1ctl01p / uxus1kub1ctl02p)
 
-Ansible automation that creates the cluster VMs on the two KVM hosts with your existing `ulx.ops` roles, configures them, and builds an HA kubeadm cluster: 3 control planes behind your HAProxy + keepalived API VIP, 5 workers, containerd and Calico.
+Ansible automation that creates the cluster VMs on the two KVM hosts with your existing `ulx.ops` roles, configures them, and builds an HA kubeadm cluster: 3 control planes behind your HAProxy + keepalived API VIP, 6 workers, containerd and Calico.
 
 It is a refactor of your existing provisioning playbook. The four copy-pasted "Create ... on ctlXXp" blocks are replaced by one loop driven by `inventory/hosts.yml`, so adding or moving a VM is a one-line inventory change.
 
@@ -18,7 +18,7 @@ It is a refactor of your existing provisioning playbook. The four copy-pasted "C
 | `02-base-config.yml` | all VMs (as `ubuntu`) | Your existing plays: SSH keys, `ansible` user + sudo, sshd_config, inotify/nofile limits |
 | `03-prepare-nodes.yml` | all VMs | Swap off, kernel modules, sysctls, `/etc/hosts`, containerd (systemd cgroups), kubelet/kubeadm/kubectl (held), kubelet pinned to the 10.73.5.x NIC |
 | `04-api-lb.yml` | control planes | Your `ulx.ops.k8s_api_lb`: VIP 10.71.251.26, HAProxy :8443 → apiservers :6443 |
-| `05-control-plane.yml` | control planes, one at a time | `kubeadm init` on uxus1kub2ctr001, `kubeadm join --control-plane` on ctr002/003, `admin.conf` copied to `artifacts/` |
+| `05-control-plane.yml` | control planes, one at a time | `kubeadm init` on ctr001, `kubeadm join --control-plane` on ctr002/003, `admin.conf` copied to `artifacts/` |
 | `06-cni.yml` | ctr001 | Calico via the Tigera operator, node addresses taken from 10.73.5.0/24 |
 | `07-join-workers.yml` | workers | `kubeadm join`, worker label, waits for every node Ready |
 | `site.yml` | | Runs 01 to 07 |
@@ -75,5 +75,5 @@ export KUBECONFIG=$PWD/artifacts/admin.conf && kubectl get nodes -o wide
 
 ## Limits
 
-- **Etcd quorum.** uxus1kub2ctl01p runs two control planes (ctr001, ctr003). If that host goes down, etcd loses quorum and the API stops, though running pods keep going. Losing ctl02p is fine. True host-level HA needs a third host.
+- **Etcd quorum.** ctl01p runs two control planes (ctr001, ctr003). If that host goes down, etcd loses quorum and the API stops, though running pods keep going. Losing ctl02p is fine. True host-level HA needs a third host.
 - **Upgrades** are not automated. Bump `k8s_version_minor`, then run `kubeadm upgrade` node by node.
