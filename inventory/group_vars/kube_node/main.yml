@@ -1,0 +1,2 @@
+---
+vm_packages: [nfs-common]              # Longhorn RWX volumes need the NFS client

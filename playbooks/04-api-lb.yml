@@ -1,0 +1,24 @@
+---
+# Your existing HAProxy + keepalived VIP, fed from inventory.
+- name: Configure Kubernetes API VIP load balancer (HAProxy + keepalived)
+  hosts: kube_control_plane
+  gather_facts: true
+  pre_tasks:
+    - name: First control plane is keepalived MASTER, the rest BACKUP
+      ansible.builtin.set_fact:
+        k8s_api_keepalived_state_effective: "{{ 'MASTER' if groups['kube_control_plane'].index(inventory_hostname) == 0 else 'BACKUP' }}"
+        k8s_api_keepalived_priority_effective: "{{ 101 - groups['kube_control_plane'].index(inventory_hostname) }}"
+  roles:
+    - role: ulx.ops.k8s_api_lb
+      vars:
+        k8s_api_vip_cidr: "{{ k8s_api_vip }}/{{ vm_mgmt_prefix }}"
+        k8s_api_interface: "{{ vm_mgmt_interface }}"
+        k8s_api_backend_port: 6443
+        k8s_api_keepalived_auth_pass: "{{ vault_k8s_api_keepalived_auth_pass }}"
+        k8s_api_keepalived_state: "{{ k8s_api_keepalived_state_effective }}"
+        k8s_api_keepalived_priority: "{{ k8s_api_keepalived_priority_effective }}"
+        k8s_api_backends: >-
+          {{ groups['kube_control_plane'] | map('community.general.dict_kv', 'name')
+             | zip(groups['kube_control_plane'] | map('extract', hostvars, 'ansible_host')
+                   | map('community.general.dict_kv', 'ip'))
+             | map('list') | map('combine') | list }}

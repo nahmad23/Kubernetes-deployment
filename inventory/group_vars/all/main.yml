@@ -1,0 +1,28 @@
+---
+# ---- VM networks (as in your existing provisioning code) ----
+kvm_vm_networks: [br0, br1]            # NIC order: enp1s0 = br0, enp2s0 = br1
+vm_mgmt_prefix: 24                     # br0: 10.71.251.0/24
+vm_k8s_prefix: 24                      # br1: 10.73.5.0/24
+vm_gateway: 10.71.251.254
+vm_dns_servers: [10.71.10.245, 10.71.13.8]
+k8s_node_cidr: 10.73.5.0/24            # Calico and kubelet pick node IPs from here
+vm_mgmt_interface: enp1s0              # NIC names libvirt gives virtio NICs 1 and 2
+vm_k8s_interface: enp2s0
+
+# ---- API endpoint: HAProxy + keepalived on the control planes (ulx.ops.k8s_api_lb) ----
+# No DNS, so every node gets this name in /etc/hosts.
+k8s_api_vip: 10.71.251.26
+k8s_api_frontend_port: 8443
+k8s_api_fqdn: lb-apiserver.kubernetes.ulx.com
+k8s_control_plane_endpoint: "{{ k8s_api_fqdn }}:{{ k8s_api_frontend_port }}"
+
+# ---- Kubernetes ----
+k8s_version_minor: "1.35"              # pkgs.k8s.io repo channel
+k8s_pod_cidr: 192.168.0.0/16           # must not overlap 10.71.251.0/24 or 10.73.5.0/24
+k8s_service_cidr: 10.96.0.0/12
+calico_version: v3.30.3
+
+# ---- Access ----
+# ulx_ssh_authorized_keys, vault_kvm_vm_root_password and
+# vault_k8s_api_keepalived_auth_pass come from your existing all.yml / vault.yml.
+vm_admin_user: ansible

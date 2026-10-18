@@ -1,0 +1,9 @@
+---
+# End to end: VMs -> base config -> node prep -> API VIP -> control plane -> CNI -> workers
+- import_playbook: 01-provision-vms.yml
+- import_playbook: 02-base-config.yml
+- import_playbook: 03-prepare-nodes.yml
+- import_playbook: 04-api-lb.yml
+- import_playbook: 05-control-plane.yml
+- import_playbook: 06-cni.yml
+- import_playbook: 07-join-workers.yml

@@ -1,0 +1,25 @@
+---
+- name: Initialise the first control plane
+  ansible.builtin.include_tasks: init.yml
+  when: inventory_hostname == k8s_first_control_plane
+
+- name: Join the other control planes
+  ansible.builtin.include_tasks: join.yml
+  when: inventory_hostname != k8s_first_control_plane
+
+- name: Create .kube for the admin user
+  ansible.builtin.file:
+    path: "/home/{{ vm_admin_user }}/.kube"
+    state: directory
+    owner: "{{ vm_admin_user }}"
+    group: "{{ vm_admin_user }}"
+    mode: "0700"
+
+- name: Give the admin user a kubeconfig
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "/home/{{ vm_admin_user }}/.kube/config"
+    remote_src: true
+    owner: "{{ vm_admin_user }}"
+    group: "{{ vm_admin_user }}"
+    mode: "0600"

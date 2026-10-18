@@ -1,0 +1,6 @@
+---
+ansible_become: true
+
+# Passed to ulx.ops.kvm_vm_provision for every VM
+kvm_vm_cloud_image_url: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
+kvm_vm_cloud_image_name: noble-server-cloudimg-amd64.img

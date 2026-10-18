@@ -1,0 +1,8 @@
+---
+# First node runs kubeadm init; the rest join one at a time to keep etcd stable.
+- name: Build the control plane
+  hosts: kube_control_plane
+  serial: 1
+  order: inventory
+  roles:
+    - k8s_control_plane

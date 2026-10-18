@@ -1,0 +1,3 @@
+---
+calico_manifest_base: "https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests"
+calico_encapsulation: VXLANCrossSubnet

@@ -1,0 +1,5 @@
+---
+- name: Install the CNI (Calico)
+  hosts: kube_control_plane[0]
+  roles:
+    - k8s_cni
